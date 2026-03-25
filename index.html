@@ -159,6 +159,10 @@
   .card:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 10px 0 rgba(0,0,0,0.15); }
   .card:active { transform: scale(0.95); }
   .card.has-recording { border-color: var(--grass); }
+  .card.has-server-audio { border-color: var(--water); }
+  .card.has-server-audio .rec-badge { display: flex; background: var(--water); }
+  .card.no-audio { opacity: 0.6; }
+  .card.no-audio .card-emoji { filter: drop-shadow(2px 3px 0 rgba(0,0,0,0.1)) grayscale(0.4); }
   .card.correct { border-color: var(--grass); background: #E8FFF2; animation: bounce-card 0.5s ease; }
   .card.wrong { border-color: var(--earth); background: #FFF0EC; animation: shake-card 0.4s ease; }
 
@@ -647,37 +651,42 @@ function getAudioFileName(item) {
 function speak(item) {
   const key = getKey(item);
   const ind = document.getElementById('soundIndicator');
-
-  // 1. Priorité : fichier audio/ sur le serveur
   const fileName = getAudioFileName(item);
-  const audioUrl = `audio/${fileName}.webm`;
-  const testAudio = new Audio();
-  testAudio.src = audioUrl;
-  testAudio.onerror = () => {
-    // 2. Fallback : IndexedDB (enregistrement local)
-    if (audioCache[key]) { playBlob(audioCache[key]); return; }
-    // 3. Fallback final : synthèse vocale
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    ind.classList.add('playing');
-    const voices = synth.getVoices();
-    const voice = voices.find(v => v.lang.startsWith('km'));
-    const utt = new SpeechSynthesisUtterance(voice ? item.km : item.ph);
-    if (voice) { utt.voice = voice; utt.lang = 'km-KH'; } else { utt.lang = 'fr-FR'; }
-    utt.rate = 0.7; utt.pitch = 1.1;
-    utt.onend = () => setTimeout(() => ind.classList.remove('playing'), 300);
-    utt.onerror = () => ind.classList.remove('playing');
-    synth.speak(utt);
-  };
-  testAudio.oncanplaythrough = () => {
-    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-    currentAudio = testAudio;
-    currentAudio.playbackRate = 0.9;
-    ind.classList.add('playing');
-    currentAudio.onended = () => ind.classList.remove('playing');
-    currentAudio.onerror = () => ind.classList.remove('playing');
-    currentAudio.play().catch(() => ind.classList.remove('playing'));
-  };
+  const formats = ['webm', 'm4a', 'ogg'];
+
+  // Essaie chaque format dans l'ordre jusqu'à en trouver un qui marche
+  function tryFormat(i) {
+    if (i >= formats.length) {
+      // 2. Fallback : IndexedDB (enregistrement local)
+      if (audioCache[key]) { playBlob(audioCache[key]); return; }
+      // 3. Fallback final : synthèse vocale
+      const synth = window.speechSynthesis;
+      synth.cancel();
+      ind.classList.add('playing');
+      const voices = synth.getVoices();
+      const voice = voices.find(v => v.lang.startsWith('km'));
+      const utt = new SpeechSynthesisUtterance(voice ? item.km : item.ph);
+      if (voice) { utt.voice = voice; utt.lang = 'km-KH'; } else { utt.lang = 'fr-FR'; }
+      utt.rate = 0.7; utt.pitch = 1.1;
+      utt.onend = () => setTimeout(() => ind.classList.remove('playing'), 300);
+      utt.onerror = () => ind.classList.remove('playing');
+      synth.speak(utt);
+      return;
+    }
+    const audio = new Audio();
+    audio.src = `audio/${fileName}.${formats[i]}`;
+    audio.onerror = () => tryFormat(i + 1);
+    audio.oncanplaythrough = () => {
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+      currentAudio = audio;
+      currentAudio.playbackRate = 0.9;
+      ind.classList.add('playing');
+      currentAudio.onended = () => ind.classList.remove('playing');
+      currentAudio.onerror = () => ind.classList.remove('playing');
+      currentAudio.play().catch(() => ind.classList.remove('playing'));
+    };
+  }
+  tryFormat(0);
 }
 
 // --- Render ---
@@ -693,21 +702,50 @@ function renderThemes() {
   });
 }
 
+const serverAudioCache = {}; // key -> format trouvé ('webm','m4a','ogg') ou false
+
+function checkServerAudio(item) {
+  const key = getKey(item);
+  if (serverAudioCache[key] !== undefined) return;
+  serverAudioCache[key] = null; // en cours
+  const fileName = getAudioFileName(item);
+  const formats = ['webm', 'm4a', 'ogg'];
+  function tryFmt(i) {
+    if (i >= formats.length) { serverAudioCache[key] = false; renderGrid(); return; }
+    const a = new Audio();
+    a.src = `audio/${fileName}.${formats[i]}`;
+    a.onerror = () => tryFmt(i + 1);
+    a.oncanplaythrough = () => { serverAudioCache[key] = formats[i]; renderGrid(); };
+  }
+  tryFmt(0);
+}
+
 function renderGrid() {
   const grid = document.getElementById('grid');
   grid.className = 'grid' + (recordMode ? ' record-mode' : '');
   grid.innerHTML = '';
   currentTheme.items.forEach((item, i) => {
+    const hasLocal = hasRecording(item);
+    const serverFmt = serverAudioCache[getKey(item)];
+    const hasServer = !!serverFmt;
+    const hasAny = hasLocal || hasServer;
+    if (serverAudioCache[getKey(item)] === undefined) checkServerAudio(item);
+
+    let cls = 'card';
+    if (hasLocal) cls += ' has-recording';
+    else if (hasServer) cls += ' has-server-audio';
+    else if (serverAudioCache[getKey(item)] === false) cls += ' no-audio';
+
     const card = document.createElement('div');
-    card.className = 'card' + (hasRecording(item) ? ' has-recording' : '');
+    card.className = cls;
     card.innerHTML = `
       <div class="card-emoji">${item.emoji}</div>
       <div class="card-khmer">${item.km}</div>
       <div class="card-fr">${item.fr}</div>
-      <div class="rec-badge">✓</div>
+      <div class="rec-badge">${hasLocal ? '✓' : '🔊'}</div>
       <div class="card-rec-btn">
-        <span class="mic-icon">${hasRecording(item) ? '🔄' : '🎙️'}</span>
-        <span class="rec-label">${hasRecording(item) ? 'RE-ENREG.' : 'ENREGISTRER'}</span>
+        <span class="mic-icon">${hasLocal ? '🔄' : '🎙️'}</span>
+        <span class="rec-label">${hasLocal ? 'RE-ENREG.' : 'ENREGISTRER'}</span>
       </div>
     `;
     card.onclick = (e) => onCardClick(e, card, item, i);
