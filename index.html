@@ -610,21 +610,44 @@ function playBlob(blob) {
   currentAudio.onerror = () => ind.classList.remove('playing');
   currentAudio.play().catch(() => ind.classList.remove('playing'));
 }
+function getAudioFileName(item) {
+  return item.fr.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+}
+
 function speak(item) {
   const key = getKey(item);
-  if (audioCache[key]) { playBlob(audioCache[key]); return; }
-  const synth = window.speechSynthesis;
-  synth.cancel();
   const ind = document.getElementById('soundIndicator');
-  ind.classList.add('playing');
-  const voices = synth.getVoices();
-  const voice = voices.find(v => v.lang.startsWith('km'));
-  const utt = new SpeechSynthesisUtterance(voice ? item.km : item.ph);
-  if (voice) { utt.voice = voice; utt.lang = 'km-KH'; } else { utt.lang = 'fr-FR'; }
-  utt.rate = 0.7; utt.pitch = 1.1;
-  utt.onend = () => setTimeout(() => ind.classList.remove('playing'), 300);
-  utt.onerror = () => ind.classList.remove('playing');
-  synth.speak(utt);
+
+  // 1. Priorité : fichier audio/ sur le serveur
+  const fileName = getAudioFileName(item);
+  const audioUrl = `audio/${fileName}.webm`;
+  const testAudio = new Audio();
+  testAudio.src = audioUrl;
+  testAudio.onerror = () => {
+    // 2. Fallback : IndexedDB (enregistrement local)
+    if (audioCache[key]) { playBlob(audioCache[key]); return; }
+    // 3. Fallback final : synthèse vocale
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    ind.classList.add('playing');
+    const voices = synth.getVoices();
+    const voice = voices.find(v => v.lang.startsWith('km'));
+    const utt = new SpeechSynthesisUtterance(voice ? item.km : item.ph);
+    if (voice) { utt.voice = voice; utt.lang = 'km-KH'; } else { utt.lang = 'fr-FR'; }
+    utt.rate = 0.7; utt.pitch = 1.1;
+    utt.onend = () => setTimeout(() => ind.classList.remove('playing'), 300);
+    utt.onerror = () => ind.classList.remove('playing');
+    synth.speak(utt);
+  };
+  testAudio.oncanplaythrough = () => {
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    currentAudio = testAudio;
+    currentAudio.playbackRate = 0.9;
+    ind.classList.add('playing');
+    currentAudio.onended = () => ind.classList.remove('playing');
+    currentAudio.onerror = () => ind.classList.remove('playing');
+    currentAudio.play().catch(() => ind.classList.remove('playing'));
+  };
 }
 
 // --- Render ---
