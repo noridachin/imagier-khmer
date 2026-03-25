@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>រូបភាព - Imagier Khmer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Noto+Serif+Khmer:wght@400;700&display=swap');
+
+  :root {
+    --sky: #FFE566;
+    --grass: #4DD882;
+    --earth: #FF7043;
+    --water: #40C4FF;
+    --pink: #FF6B9D;
+    --purple: #B388FF;
+    --bg: #FFF8E7;
+    --card-r: 22px;
+    --shadow: 0 6px 0 rgba(0,0,0,0.18);
+    --rec: #FF3B30;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Baloo 2', cursive;
+    background: var(--bg);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(255,229,102,0.35) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(77,216,130,0.25) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(64,196,255,0.15) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 0 180px 0;
+    min-height: 100vh;
+  }
+
+  header {
+    text-align: center;
+    padding: 24px 20px 8px;
+  }
+
+  .app-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--earth);
+    line-height: 1;
+    text-shadow: 3px 3px 0 rgba(255,112,67,0.2);
+  }
+
+  .app-title span {
+    font-family: 'Noto Serif Khmer', serif;
+    color: var(--pink);
+    display: block;
+    font-size: 1.4rem;
+    margin-top: 2px;
+  }
+
+  .score-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #888;
+    padding: 4px 0 2px;
+  }
+  .star { color: var(--sky); font-size: 1.2rem; }
+
+  .rec-banner {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #FFF3F3;
+    border-top: 3px solid var(--rec);
+    border-bottom: 3px solid var(--rec);
+    padding: 10px 16px;
+    font-weight: 700;
+    color: var(--rec);
+    font-size: 0.95rem;
+  }
+  .rec-banner.visible { display: flex; }
+  .rec-banner .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--rec);
+    animation: blink-dot 1s ease infinite;
+  }
+  @keyframes blink-dot { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .themes-row {
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .themes-row::-webkit-scrollbar { display: none; }
+
+  .theme-btn {
+    flex: 0 0 auto;
+    background: white;
+    border: 3px solid transparent;
+    border-radius: 50px;
+    padding: 7px 16px;
+    font-family: 'Baloo 2', cursive;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s;
+    box-shadow: var(--shadow);
+    white-space: nowrap;
+  }
+  .theme-btn:hover { transform: translateY(-2px); }
+  .theme-btn.active { background: var(--earth); color: white; transform: translateY(-3px); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    padding: 10px 16px;
+  }
+  @media (max-width: 380px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .card {
+    background: white;
+    border-radius: var(--card-r);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.18s, box-shadow 0.18s;
+    border: 3px solid transparent;
+    aspect-ratio: 1/1.2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .card:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 10px 0 rgba(0,0,0,0.15); }
+  .card:active { transform: scale(0.95); }
+  .card.has-recording { border-color: var(--grass); }
+  .card.correct { border-color: var(--grass); background: #E8FFF2; animation: bounce-card 0.5s ease; }
+  .card.wrong { border-color: var(--earth); background: #FFF0EC; animation: shake-card 0.4s ease; }
+
+  @keyframes bounce-card { 0%{transform:scale(1)} 40%{transform:scale(1.15) rotate(-3deg)} 70%{transform:scale(0.95) rotate(2deg)} 100%{transform:scale(1) rotate(0)} }
+  @keyframes shake-card { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px) rotate(-2deg)} 60%{transform:translateX(8px) rotate(2deg)} }
+
+  .card-emoji {
+    font-size: 3rem;
+    line-height: 1;
+    margin-bottom: 4px;
+    filter: drop-shadow(2px 3px 0 rgba(0,0,0,0.1));
+    transition: transform 0.2s;
+  }
+  .card:hover .card-emoji { transform: scale(1.1) rotate(-5deg); }
+
+  .card-khmer {
+    font-family: 'Noto Serif Khmer', serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #5A3E28;
+    text-align: center;
+    padding: 0 4px;
+    line-height: 1.3;
+  }
+  .card-fr { font-size: 0.7rem; color: #AAA; font-weight: 600; margin-top: 2px; }
+
+  .rec-badge {
+    position: absolute;
+    top: 6px; right: 6px;
+    background: var(--grass);
+    color: white;
+    border-radius: 50%;
+    width: 22px; height: 22px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 800;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  }
+  .card.has-recording .rec-badge { display: flex; }
+
+  .card-rec-btn {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.0);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    border-radius: var(--card-r);
+    transition: background 0.15s;
+    z-index: 2;
+    cursor: pointer;
+  }
+  .record-mode .card-rec-btn { display: flex; }
+  .card-rec-btn:hover { background: rgba(255,59,48,0.08); }
+
+  .card-rec-btn .mic-icon { font-size: 2rem; }
+  .card-rec-btn .rec-label { font-size: 0.62rem; font-weight: 800; color: #999; letter-spacing: 0.3px; }
+
+  .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,229,102,0.6);
+    transform: scale(0);
+    animation: ripple-out 0.5s linear;
+    pointer-events: none;
+  }
+  @keyframes ripple-out { to { transform: scale(3); opacity: 0; } }
+
+  .bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 10px 16px 18px;
+    background: linear-gradient(to top, var(--bg) 75%, transparent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bar-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+    justify-content: center;
+  }
+
+  .quiz-btn {
+    flex: 1;
+    background: var(--pink);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 14px 24px;
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.1rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #c2185b;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .quiz-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #c2185b; }
+  .quiz-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #c2185b; }
+  .quiz-btn.active { background: var(--purple); box-shadow: 0 6px 0 #7e57c2; }
+  .quiz-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+  .rec-toggle-btn {
+    background: white;
+    color: #555;
+    border: 3px solid #eee;
+    border-radius: 50px;
+    padding: 14px 18px;
+    font-family: 'Baloo 2', cursive;
+    font-size: 0.95rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: all 0.15s;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .rec-toggle-btn:hover { transform: translateY(-2px); }
+  .rec-toggle-btn.active { background: var(--rec); color: white; border-color: transparent; box-shadow: 0 6px 0 #b71c1c; }
+
+  .quiz-prompt {
+    background: white;
+    border-radius: 50px;
+    padding: 10px 24px;
+    box-shadow: var(--shadow);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #333;
+    text-align: center;
+    width: 100%;
+    max-width: 500px;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+  .quiz-prompt.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .quiz-prompt .khmer-word {
+    font-family: 'Noto Serif Khmer', serif;
+    font-size: 1.3rem;
+    color: var(--purple);
+    display: block;
+    margin-top: 2px;
+  }
+  .replay-btn {
+    background: none; border: none;
+    font-size: 1.1rem; cursor: pointer;
+    vertical-align: middle; padding: 0 4px;
+    transition: transform 0.15s;
+  }
+  .replay-btn:hover { transform: scale(1.3); }
+
+  .feedback {
+    position: fixed; inset: 0;
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+    pointer-events: none; opacity: 0; transition: opacity 0.2s;
+  }
+  .feedback.show { opacity: 1; pointer-events: all; }
+  .feedback-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(4px); }
+  .feedback-bubble {
+    background: white; border-radius: 28px; padding: 28px 44px;
+    text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    transform: scale(0.5); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.4);
+    position: relative; z-index: 1;
+  }
+  .feedback.show .feedback-bubble { transform: scale(1); }
+  .feedback-emoji { font-size: 3.8rem; display: block; margin-bottom: 8px; }
+  .feedback-text { font-size: 2rem; font-weight: 800; }
+  .feedback-text.good { color: var(--grass); }
+  .feedback-text.bad { color: var(--earth); }
+  .feedback-sub { font-size: 0.95rem; color: #999; margin-top: 4px; font-family: 'Noto Serif Khmer', serif; }
+
+  /* RECORDING MODAL */
+  .rec-modal {
+    position: fixed; inset: 0; z-index: 300;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .rec-modal.open { display: flex; }
+  .rec-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); }
+  .rec-modal-box {
+    position: relative; z-index: 1;
+    background: white; border-radius: 28px; padding: 28px 24px;
+    text-align: center; max-width: 320px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+  .rec-modal-emoji { font-size: 3.5rem; display: block; margin-bottom: 6px; }
+  .rec-modal-khmer { font-family: 'Noto Serif Khmer', serif; font-size: 1.8rem; font-weight: 700; color: #5A3E28; display: block; margin-bottom: 2px; }
+  .rec-modal-fr { color: #AAA; font-size: 0.9rem; margin-bottom: 20px; }
+
+  .waveform {
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+    height: 30px; margin-bottom: 10px; opacity: 0; transition: opacity 0.3s;
+  }
+  .waveform.active { opacity: 1; }
+  .wave-bar { width: 4px; background: var(--rec); border-radius: 4px; height: 6px; animation: wave-anim 0.5s ease infinite; }
+  .wave-bar:nth-child(2){animation-delay:0.1s} .wave-bar:nth-child(3){animation-delay:0.2s}
+  .wave-bar:nth-child(4){animation-delay:0.3s} .wave-bar:nth-child(5){animation-delay:0.15s}
+  .wave-bar:nth-child(6){animation-delay:0.05s} .wave-bar:nth-child(7){animation-delay:0.25s}
+  @keyframes wave-anim { 0%,100%{height:5px} 50%{height:22px} }
+
+  .rec-progress { width: 100%; height: 6px; background: #eee; border-radius: 10px; overflow: hidden; margin-bottom: 18px; }
+  .rec-progress-fill { height: 100%; background: var(--rec); border-radius: 10px; width: 0%; transition: width 0.1s linear; }
+
+  .rec-hold-btn {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: var(--rec); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem;
+    box-shadow: 0 8px 0 #b71c1c;
+    transition: all 0.15s;
+    margin: 0 auto 12px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  .rec-hold-btn.recording {
+    transform: scale(0.92); box-shadow: 0 4px 0 #b71c1c;
+    background: #c62828;
+    animation: pulse-glow 0.6s ease infinite;
+  }
+  @keyframes pulse-glow {
+    0%,100%{ box-shadow: 0 4px 0 #b71c1c; }
+    50%{ box-shadow: 0 4px 0 #b71c1c, 0 0 0 14px rgba(255,59,48,0.2); }
+  }
+
+  .rec-instructions { font-size: 0.85rem; color: #999; margin-bottom: 10px; line-height: 1.5; }
+  .rec-status { font-size: 0.9rem; font-weight: 700; min-height: 1.4em; color: var(--rec); margin-bottom: 16px; }
+
+  .rec-modal-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .btn-secondary {
+    background: #f0f0f0; border: none; border-radius: 50px; padding: 10px 18px;
+    font-family: 'Baloo 2', cursive; font-size: 0.9rem; font-weight: 700;
+    cursor: pointer; color: #555; transition: all 0.15s;
+  }
+  .btn-secondary:hover { background: #e0e0e0; }
+  .btn-secondary:disabled { opacity: 0.4; cursor: default; }
+  .btn-primary {
+    background: var(--grass); border: none; border-radius: 50px; padding: 10px 22px;
+    font-family: 'Baloo 2', cursive; font-size: 0.9rem; font-weight: 700;
+    cursor: pointer; color: white; box-shadow: 0 4px 0 #2e7d32; transition: all 0.15s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+  .sound-indicator {
+    position: fixed; top: 18px; right: 16px; z-index: 300;
+    background: white; border-radius: 50%; width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow); font-size: 1.3rem;
+    opacity: 0; transform: scale(0.5); transition: all 0.2s;
+  }
+  .sound-indicator.playing { opacity: 1; transform: scale(1); animation: sound-pulse 0.8s ease infinite; }
+  @keyframes sound-pulse { 0%,100%{box-shadow:var(--shadow)} 50%{box-shadow:var(--shadow), 0 0 0 10px rgba(255,107,157,0.2)} }
+
+  .deco { position: fixed; pointer-events: none; z-index: 0; font-size: 1.8rem; opacity: 0.12; animation: float-deco 6s ease-in-out infinite; }
+  .deco:nth-child(2){animation-delay:-2s} .deco:nth-child(3){animation-delay:-4s}
+  @keyframes float-deco { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-15px) rotate(10deg)} }
+</style>
+</head>
+<body>
+
+<div class="deco" style="top:5%;left:3%">🌸</div>
+<div class="deco" style="top:15%;right:4%">⭐</div>
+<div class="deco" style="bottom:30%;left:6%">🌈</div>
+
+<div id="app">
+  <header>
+    <div class="app-title">រូបភាព <span>Imagier Khmer</span></div>
+    <div class="score-bar">
+      <span class="star">⭐</span>
+      <span id="scoreText">Score : 0</span>
+      <span class="star">⭐</span>
+    </div>
+  </header>
+
+  <div class="rec-banner" id="recBanner">
+    <div class="dot"></div>
+    Mode enregistrement — Touche une carte pour enregistrer sa prononciation
+  </div>
+
+  <div class="themes-row" id="themesRow"></div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="bottom-bar">
+  <div class="quiz-prompt" id="quizPrompt">
+    <span>Touche l'image qui correspond à :</span>
+    <span class="khmer-word" id="quizWord"></span>
+    <button class="replay-btn" onclick="replayQuiz()" title="Réécouter">🔊</button>
+  </div>
+  <div class="bar-row">
+    <button class="rec-toggle-btn" id="recToggleBtn" onclick="toggleRecordMode()">🎙️ Enregistrer</button>
+    <button class="quiz-btn" id="quizBtn" onclick="startQuiz()">🎲 Quiz !</button>
+    <button class="quiz-btn" id="exportBtn" onclick="exportAllAudio()" style="background:#B388FF;box-shadow:0 4px 0 #7c4dff;" title="Exporter tous les enregistrements">💾 Exporter</button>
+  </div>
+</div>
+
+<!-- RECORDING MODAL -->
+<div class="rec-modal" id="recModal">
+  <div class="rec-modal-backdrop" onclick="closeRecModal()"></div>
+  <div class="rec-modal-box">
+    <span class="rec-modal-emoji" id="modalEmoji"></span>
+    <span class="rec-modal-khmer" id="modalKhmer"></span>
+    <div class="rec-modal-fr" id="modalFr"></div>
+    <div class="waveform" id="waveform">
+      <div class="wave-bar"></div><div class="wave-bar"></div>
+      <div class="wave-bar"></div><div class="wave-bar"></div>
+      <div class="wave-bar"></div><div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+    </div>
+    <div class="rec-progress"><div class="rec-progress-fill" id="recProgressFill"></div></div>
+    <button class="rec-hold-btn" id="recHoldBtn">🎙️</button>
+    <div class="rec-instructions">Appuie sur le bouton et parle clairement.<br>Relâche quand tu as terminé.</div>
+    <div class="rec-status" id="recStatus">Prêt à enregistrer</div>
+    <div class="rec-modal-actions">
+      <button class="btn-secondary" onclick="closeRecModal()">✕ Annuler</button>
+      <button class="btn-secondary" id="btnPlayback" onclick="playRecording()" disabled>▶ Écouter</button>
+      <button class="btn-primary" id="btnSave" onclick="saveRecording()" disabled>✓ Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<!-- FEEDBACK -->
+<div class="feedback" id="feedback">
+  <div class="feedback-backdrop" onclick="closeFeedback()"></div>
+  <div class="feedback-bubble">
+    <span class="feedback-emoji" id="feedbackEmoji"></span>
+    <div class="feedback-text" id="feedbackText"></div>
+    <div class="feedback-sub" id="feedbackSub"></div>
+  </div>
+</div>
+
+<div class="sound-indicator" id="soundIndicator">🔊</div>
+
+<script>
+const themes = [
+  { id:'ferme', label:'🐄 Ferme', items:[
+    {emoji:'🐄',fr:'Vache',  km:'គោ',            ph:'koo'},
+    {emoji:'🐷',fr:'Cochon', km:'ជ្រូក',          ph:'chruuk'},
+    {emoji:'🐔',fr:'Poule',  km:'មាន់',           ph:'moan'},
+    {emoji:'🐴',fr:'Cheval', km:'សេះ',            ph:'seh'},
+    {emoji:'🐑',fr:'Mouton', km:'ចៀម',           ph:'chiem'},
+    {emoji:'🐐',fr:'Chèvre', km:'ពពែ',           ph:'po-peh'},
+  ]},
+  { id:'fruits', label:'🍎 Fruits', items:[
+    {emoji:'🍎',fr:'Pomme',  km:'ប៉ោម',          ph:'paom'},
+    {emoji:'🍌',fr:'Banane', km:'ចេក',           ph:'chek'},
+    {emoji:'🍇',fr:'Raisin', km:'ទំពាំងបាយជូរ',  ph:'tom-péang'},
+    {emoji:'🍊',fr:'Orange', km:'ក្រូច',          ph:'krooch'},
+    {emoji:'🍓',fr:'Fraise', km:'ស្ត្របឺរី',       ph:'straw-beu-ri'},
+    {emoji:'🥭',fr:'Mangue', km:'ស្វាយ',          ph:'svay'},
+  ]},
+  { id:'savane', label:'🦁 Savane', items:[
+    {emoji:'🦁',fr:'Lion',    km:'សិង្ហ',          ph:'seng-ha'},
+    {emoji:'🐘',fr:'Éléphant',km:'ដំរី',           ph:'dam-rai'},
+    {emoji:'🦒',fr:'Girafe',  km:'កាមេ',          ph:'ka-meh'},
+    {emoji:'🐆',fr:'Léopard', km:'ខ្លា',           ph:'khlaa'},
+    {emoji:'🦓',fr:'Zèbre',   km:'សេះបង្ហោះ',     ph:'seh ban-hoh'},
+    {emoji:'🦏',fr:'Rhino',   km:'រមាស',          ph:'ro-méas'},
+  ]},
+  { id:'corps', label:'👁️ Corps', items:[
+    {emoji:'👁️',fr:'Œil',    km:'ភ្នែក',          ph:'phnek'},
+    {emoji:'👂',fr:'Oreille', km:'ត្រចៀក',         ph:'tra-chiek'},
+    {emoji:'👃',fr:'Nez',     km:'ច្រមុះ',          ph:'chro-moh'},
+    {emoji:'👄',fr:'Bouche',  km:'មាត់',           ph:'moat'},
+    {emoji:'🤚',fr:'Main',    km:'ដៃ',             ph:'dai'},
+    {emoji:'🦶',fr:'Pied',    km:'ជើង',           ph:'cheung'},
+  ]},
+  { id:'couleurs', label:'🎨 Couleurs', items:[
+    {emoji:'🔴',fr:'Rouge',   km:'ក្រហម',          ph:'kra-hom'},
+    {emoji:'🔵',fr:'Bleu',    km:'ខៀវ',            ph:'khiev'},
+    {emoji:'🟡',fr:'Jaune',   km:'លឿង',           ph:'leuang'},
+    {emoji:'🟢',fr:'Vert',    km:'បៃតង',          ph:'bay-tang'},
+    {emoji:'🟠',fr:'Orange',  km:'ទឹកក្រូច',        ph:'tuk krooch'},
+    {emoji:'🟣',fr:'Violet',  km:'ស្វាយចាស់',      ph:'svay-chas'},
+  ]},
+  { id:'repas', label:'🍚 Repas', items:[
+    {emoji:'🍚',fr:'Riz',     km:'បាយ',            ph:'bay'},
+    {emoji:'🍜',fr:'Soupe',   km:'នំបញ្ចុក',        ph:'nom ban-chok'},
+    {emoji:'🥚',fr:'Œuf',     km:'ពង',             ph:'pong'},
+    {emoji:'🐠',fr:'Poisson', km:'ត្រី',            ph:'trai'},
+    {emoji:'🥛',fr:'Lait',    km:'ទឹកដោះ',         ph:'tuk doh'},
+    {emoji:'🍞',fr:'Pain',    km:'នំប័ុង',           ph:'nom-bong'},
+  ]},
+];
+
+let currentTheme = themes[0];
+let quizMode = false;
+let quizTarget = null;
+let score = 0;
+let recordMode = false;
+let mediaRecorder = null;
+let audioChunks = [];
+let currentRecordingItem = null;
+let currentRecordingBlob = null;
+let recordingInterval = null;
+let recordDuration = 0;
+const MAX_REC_MS = 5000;
+let db = null;
+const audioCache = {};
+
+// --- IndexedDB ---
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('imagier-khmer', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('recordings', {keyPath:'id'});
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = e => rej(e);
+  });
+}
+function getKey(item) { return item.fr + '_' + item.km; }
+async function saveAudioToDB(item, blob) {
+  const key = getKey(item);
+  const tx = db.transaction('recordings','readwrite');
+  tx.objectStore('recordings').put({id:key, blob});
+  audioCache[key] = blob;
+}
+async function loadAllAudio() {
+  return new Promise(res => {
+    const tx = db.transaction('recordings','readonly');
+    const req = tx.objectStore('recordings').getAll();
+    req.onsuccess = e => { e.target.result.forEach(r => audioCache[r.id]=r.blob); res(); };
+    req.onerror = () => res();
+  });
+}
+function hasRecording(item) { return !!audioCache[getKey(item)]; }
+
+// --- Audio ---
+let currentAudio = null;
+function playBlob(blob) {
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  const url = URL.createObjectURL(blob);
+  currentAudio = new Audio(url);
+  currentAudio.playbackRate = 0.9;
+  const ind = document.getElementById('soundIndicator');
+  ind.classList.add('playing');
+  currentAudio.onended = () => { ind.classList.remove('playing'); URL.revokeObjectURL(url); };
+  currentAudio.onerror = () => ind.classList.remove('playing');
+  currentAudio.play().catch(() => ind.classList.remove('playing'));
+}
+function speak(item) {
+  const key = getKey(item);
+  if (audioCache[key]) { playBlob(audioCache[key]); return; }
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const ind = document.getElementById('soundIndicator');
+  ind.classList.add('playing');
+  const voices = synth.getVoices();
+  const voice = voices.find(v => v.lang.startsWith('km'));
+  const utt = new SpeechSynthesisUtterance(voice ? item.km : item.ph);
+  if (voice) { utt.voice = voice; utt.lang = 'km-KH'; } else { utt.lang = 'fr-FR'; }
+  utt.rate = 0.7; utt.pitch = 1.1;
+  utt.onend = () => setTimeout(() => ind.classList.remove('playing'), 300);
+  utt.onerror = () => ind.classList.remove('playing');
+  synth.speak(utt);
+}
+
+// --- Render ---
+function renderThemes() {
+  const row = document.getElementById('themesRow');
+  row.innerHTML = '';
+  themes.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'theme-btn' + (t.id === currentTheme.id ? ' active' : '');
+    btn.textContent = t.label;
+    btn.onclick = () => selectTheme(t);
+    row.appendChild(btn);
+  });
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.className = 'grid' + (recordMode ? ' record-mode' : '');
+  grid.innerHTML = '';
+  currentTheme.items.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'card' + (hasRecording(item) ? ' has-recording' : '');
+    card.innerHTML = `
+      <div class="card-emoji">${item.emoji}</div>
+      <div class="card-khmer">${item.km}</div>
+      <div class="card-fr">${item.fr}</div>
+      <div class="rec-badge">✓</div>
+      <div class="card-rec-btn">
+        <span class="mic-icon">${hasRecording(item) ? '🔄' : '🎙️'}</span>
+        <span class="rec-label">${hasRecording(item) ? 'RE-ENREG.' : 'ENREGISTRER'}</span>
+      </div>
+    `;
+    card.onclick = (e) => onCardClick(e, card, item, i);
+    card.querySelector('.card-rec-btn').onclick = (e) => { e.stopPropagation(); openRecModal(item); };
+    grid.appendChild(card);
+  });
+}
+
+function selectTheme(t) {
+  if (quizMode) endQuiz();
+  currentTheme = t;
+  renderThemes();
+  renderGrid();
+}
+
+function onCardClick(e, card, item, index) {
+  if (recordMode) return;
+  const r = document.createElement('div');
+  r.className = 'ripple';
+  r.style.cssText = `width:100px;height:100px;left:${e.offsetX-50}px;top:${e.offsetY-50}px`;
+  card.appendChild(r);
+  setTimeout(() => r.remove(), 600);
+  if (quizMode) handleQuizAnswer(card, item, index);
+  else speak(item);
+}
+
+// --- Quiz ---
+function startQuiz() {
+  if (recordMode) return;
+  if (quizMode) { endQuiz(); return; }
+  quizMode = true;
+  quizTarget = Math.floor(Math.random() * currentTheme.items.length);
+  const target = currentTheme.items[quizTarget];
+  document.getElementById('quizWord').textContent = target.km;
+  document.getElementById('quizPrompt').classList.add('visible');
+  document.getElementById('quizBtn').classList.add('active');
+  document.getElementById('quizBtn').textContent = '❌ Arrêter';
+  setTimeout(() => speak(target), 500);
+}
+function replayQuiz() {
+  if (!quizMode || quizTarget === null) return;
+  speak(currentTheme.items[quizTarget]);
+}
+function endQuiz() {
+  quizMode = false; quizTarget = null;
+  document.getElementById('quizPrompt').classList.remove('visible');
+  document.getElementById('quizBtn').classList.remove('active');
+  document.getElementById('quizBtn').textContent = '🎲 Quiz !';
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('correct','wrong'));
+}
+function handleQuizAnswer(card, item, index) {
+  if (index === quizTarget) {
+    card.classList.add('correct');
+    score++;
+    document.getElementById('scoreText').textContent = 'Score : ' + score;
+    showFeedback(true, item);
+    setTimeout(endQuiz, 100);
+  } else {
+    card.classList.remove('wrong');
+    void card.offsetWidth;
+    card.classList.add('wrong');
+    setTimeout(() => card.classList.remove('wrong'), 800);
+    showFeedback(false, item);
+    setTimeout(() => speak(currentTheme.items[quizTarget]), 900);
+  }
+}
+
+// --- Feedback ---
+let feedbackTimer = null;
+function showFeedback(correct, item) {
+  clearTimeout(feedbackTimer);
+  document.getElementById('feedbackEmoji').textContent = correct ? '🎉' : '😅';
+  const txt = document.getElementById('feedbackText');
+  txt.className = 'feedback-text ' + (correct ? 'good' : 'bad');
+  txt.textContent = correct ? 'Bravo !' : 'Oh non !';
+  document.getElementById('feedbackSub').textContent = correct ? item.km + ' — ' + item.fr : 'Essaie encore !';
+  document.getElementById('feedback').classList.add('show');
+  feedbackTimer = setTimeout(closeFeedback, correct ? 2200 : 1200);
+}
+function closeFeedback() { document.getElementById('feedback').classList.remove('show'); }
+
+// --- Record Mode ---
+function toggleRecordMode() {
+  if (quizMode) return;
+  recordMode = !recordMode;
+  document.getElementById('recToggleBtn').classList.toggle('active', recordMode);
+  document.getElementById('recBanner').classList.toggle('visible', recordMode);
+  document.getElementById('quizBtn').disabled = recordMode;
+  renderGrid();
+}
+
+// --- Record Modal ---
+function openRecModal(item) {
+  currentRecordingItem = item;
+  currentRecordingBlob = null;
+  document.getElementById('modalEmoji').textContent = item.emoji;
+  document.getElementById('modalKhmer').textContent = item.km;
+  document.getElementById('modalFr').textContent = item.fr;
+  document.getElementById('recStatus').textContent = 'Prêt à enregistrer';
+  document.getElementById('btnSave').disabled = true;
+  document.getElementById('btnPlayback').disabled = true;
+  document.getElementById('recProgressFill').style.width = '0%';
+  document.getElementById('waveform').classList.remove('active');
+  document.getElementById('recModal').classList.add('open');
+  setupRecordButton();
+}
+
+function closeRecModal() {
+  document.getElementById('recModal').classList.remove('open');
+  stopRecording(false);
+}
+
+function setupRecordButton() {
+  const old = document.getElementById('recHoldBtn');
+  const btn = old.cloneNode(true);
+  old.parentNode.replaceChild(btn, old);
+  btn.addEventListener('touchstart', e => { e.preventDefault(); startRecording(); }, {passive:false});
+  btn.addEventListener('touchend',   e => { e.preventDefault(); stopRecording(true); }, {passive:false});
+  btn.addEventListener('touchcancel',e => { e.preventDefault(); stopRecording(false); }, {passive:false});
+  btn.addEventListener('mousedown', () => startRecording());
+  btn.addEventListener('mouseup',   () => stopRecording(true));
+  btn.addEventListener('mouseleave',() => { if (mediaRecorder && mediaRecorder.state==='recording') stopRecording(true); });
+}
+
+async function startRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    audioChunks = [];
+
+    // Pick best supported format
+    const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4']
+      .find(m => MediaRecorder.isTypeSupported(m)) || '';
+    mediaRecorder = new MediaRecorder(stream, mimeType ? {mimeType} : {});
+
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      if (audioChunks.length > 0) {
+        currentRecordingBlob = new Blob(audioChunks, {type: mediaRecorder.mimeType || 'audio/webm'});
+        document.getElementById('btnSave').disabled = false;
+        document.getElementById('btnPlayback').disabled = false;
+        document.getElementById('recStatus').textContent = '✓ Enregistrement terminé !';
+      }
+    };
+    mediaRecorder.start(100);
+
+    const btn = document.getElementById('recHoldBtn');
+    btn.classList.add('recording');
+    btn.textContent = '⏹️';
+    document.getElementById('waveform').classList.add('active');
+    document.getElementById('recStatus').textContent = '🔴 Enregistrement en cours…';
+    document.getElementById('btnSave').disabled = true;
+    document.getElementById('btnPlayback').disabled = true;
+
+    recordDuration = 0;
+    clearInterval(recordingInterval);
+    recordingInterval = setInterval(() => {
+      recordDuration += 100;
+      document.getElementById('recProgressFill').style.width = Math.min(100, (recordDuration/MAX_REC_MS)*100) + '%';
+      if (recordDuration >= MAX_REC_MS) stopRecording(true);
+    }, 100);
+  } catch(err) {
+    document.getElementById('recStatus').textContent = '⚠️ Microphone non disponible';
+  }
+}
+
+function stopRecording(keep) {
+  clearInterval(recordingInterval);
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+  const btn = document.getElementById('recHoldBtn');
+  if (btn) { btn.classList.remove('recording'); btn.textContent = '🎙️'; }
+  document.getElementById('waveform').classList.remove('active');
+  if (!keep) {
+    audioChunks = [];
+    document.getElementById('recStatus').textContent = 'Prêt à enregistrer';
+    document.getElementById('recProgressFill').style.width = '0%';
+  }
+}
+
+function playRecording() {
+  if (currentRecordingBlob) playBlob(currentRecordingBlob);
+}
+
+async function saveRecording() {
+  if (!currentRecordingBlob || !currentRecordingItem) return;
+  await saveAudioToDB(currentRecordingItem, currentRecordingBlob);
+  document.getElementById('recModal').classList.remove('open');
+  renderGrid();
+  setTimeout(() => speak(currentRecordingItem), 400);
+}
+
+// --- Export ---
+async function exportAllAudio() {
+  const btn = document.getElementById('exportBtn');
+  const entries = Object.entries(audioCache);
+  if (entries.length === 0) {
+    alert('Aucun enregistrement trouvé.\nEnregistre des mots dans le mode 🎙️ d\'abord !');
+    return;
+  }
+
+  btn.textContent = '⏳ Export…';
+  btn.disabled = true;
+
+  // Load JSZip dynamically
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+
+  const zip = new JSZip();
+  const folder = zip.folder('audio');
+
+  // Detect extension from first blob
+  const getExt = (blob) => {
+    const t = blob.type || '';
+    if (t.includes('ogg')) return 'ogg';
+    if (t.includes('mp4') || t.includes('aac')) return 'm4a';
+    return 'webm';
+  };
+
+  for (const [key, blob] of entries) {
+    // key format: "fr_km" e.g. "Rouge_ក្រហម"
+    // Use only the French part as filename for compatibility
+    const frPart = key.split('_')[0] || key;
+    const safeName = frPart.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const ext = getExt(blob);
+    const arrayBuffer = await blob.arrayBuffer();
+    folder.file(`${safeName}.${ext}`, arrayBuffer);
+  }
+
+  // Also export a manifest JSON
+  const manifest = entries.map(([key, blob]) => {
+    const [fr, km] = key.split('_');
+    const frPart = fr || key;
+    const safeName = frPart.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const ext = getExt(blob);
+    return { key, fr, km, file: `audio/${safeName}.${ext}` };
+  });
+  zip.file('audio-manifest.json', JSON.stringify(manifest, null, 2));
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(content);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'imagier-khmer-audio.zip';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+  btn.textContent = `✅ ${entries.length} fichiers`;
+  setTimeout(() => { btn.textContent = '💾 Exporter'; btn.disabled = false; }, 3000);
+}
+
+// --- Init ---
+async function init() {
+  db = await openDB();
+  await loadAllAudio();
+  renderThemes();
+  renderGrid();
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
+init();
+</script>
+</body>
+</html>

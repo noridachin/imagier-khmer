@@ -1,0 +1,44 @@
+[
+  {
+    "key": "Banane_ចេក",
+    "fr": "Banane",
+    "km": "ចេក",
+    "file": "audio/banane.webm"
+  },
+  {
+    "key": "Cheval_សេះ",
+    "fr": "Cheval",
+    "km": "សេះ",
+    "file": "audio/cheval.webm"
+  },
+  {
+    "key": "Cochon_ជ្រូក",
+    "fr": "Cochon",
+    "km": "ជ្រូក",
+    "file": "audio/cochon.webm"
+  },
+  {
+    "key": "Mangue_ស្វាយ",
+    "fr": "Mangue",
+    "km": "ស្វាយ",
+    "file": "audio/mangue.webm"
+  },
+  {
+    "key": "Orange_ក្រូច",
+    "fr": "Orange",
+    "km": "ក្រូច",
+    "file": "audio/orange.webm"
+  },
+  {
+    "key": "Poule_មាន់",
+    "fr": "Poule",
+    "km": "មាន់",
+    "file": "audio/poule.webm"
+  },
+  {
+    "key": "Vache_គោ",
+    "fr": "Vache",
+    "km": "គោ",
+    "file": "audio/vache.webm"
+  }
+]
