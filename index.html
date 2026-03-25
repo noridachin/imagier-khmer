@@ -427,8 +427,34 @@
   .deco { position: fixed; pointer-events: none; z-index: 0; font-size: 1.8rem; opacity: 0.12; animation: float-deco 6s ease-in-out infinite; }
   .deco:nth-child(2){animation-delay:-2s} .deco:nth-child(3){animation-delay:-4s}
   @keyframes float-deco { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-15px) rotate(10deg)} }
+
+  .admin-gear-btn {
+    background: none; border: none; font-size: 1.3rem; cursor: pointer;
+    opacity: 0.25; padding: 8px; border-radius: 50%;
+    transition: all 0.2s; line-height: 1;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .admin-gear-btn:hover { opacity: 0.5; transform: rotate(30deg); }
+  .admin-gear-btn.open { opacity: 0.7; transform: rotate(60deg); }
+
+  .admin-panel {
+    display: none; gap: 8px; align-items: center;
+    width: 100%; max-width: 500px; justify-content: center;
+    flex-wrap: wrap;
+    animation: fade-in-up 0.2s ease;
+  }
+  .admin-panel.visible { display: flex; }
+  @keyframes fade-in-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .admin-action-btn {
+    background: white; color: #555; border: 2px solid #eee;
+    border-radius: 50px; padding: 10px 16px;
+    font-family: 'Baloo 2', cursive; font-size: 0.9rem; font-weight: 700;
+    cursor: pointer; box-shadow: var(--shadow); transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .admin-action-btn:hover { transform: translateY(-2px); }
 </style>
-</head>
 <body>
 
 <div class="deco" style="top:5%;left:3%">🌸</div>
@@ -461,9 +487,13 @@
     <button class="replay-btn" onclick="replayQuiz()" title="Réécouter">🔊</button>
   </div>
   <div class="bar-row">
-    <button class="rec-toggle-btn" id="recToggleBtn" onclick="toggleRecordMode()">🎙️ Enregistrer</button>
     <button class="quiz-btn" id="quizBtn" onclick="startQuiz()">🎲 Quiz !</button>
-    <button class="quiz-btn" id="exportBtn" onclick="exportAllAudio()" style="background:#B388FF;box-shadow:0 4px 0 #7c4dff;" title="Exporter tous les enregistrements">💾 Exporter</button>
+    <button class="admin-gear-btn" id="adminGearBtn" onclick="toggleAdminPanel()">⚙️</button>
+  </div>
+  <div class="admin-panel" id="adminPanel">
+    <button class="rec-toggle-btn" id="recToggleBtn" onclick="toggleRecordMode()">🎙️ Enregistrer</button>
+    <button class="admin-action-btn" id="exportBtn" onclick="exportAllAudio()">💾 Exporter</button>
+    <label class="admin-action-btn" id="importBtn">📂 Importer<input type="file" id="importInput" accept=".zip,.webm,.ogg,.m4a" multiple style="display:none" onchange="importAudioFiles(event)"></label>
   </div>
 </div>
 
@@ -758,6 +788,70 @@ function showFeedback(correct, item) {
   feedbackTimer = setTimeout(closeFeedback, correct ? 2200 : 1200);
 }
 function closeFeedback() { document.getElementById('feedback').classList.remove('show'); }
+
+// --- Admin Panel ---
+function toggleAdminPanel() {
+  const panel = document.getElementById('adminPanel');
+  const btn = document.getElementById('adminGearBtn');
+  const isOpen = panel.classList.toggle('visible');
+  btn.classList.toggle('open', isOpen);
+  if (!isOpen && recordMode) toggleRecordMode();
+}
+
+async function importAudioFiles(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+
+  const btn = document.getElementById('importBtn');
+  btn.textContent = '⏳ Import…';
+
+  let imported = 0;
+
+  // Handle ZIP
+  const zipFile = files.find(f => f.name.endsWith('.zip'));
+  if (zipFile) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+    const zip = await JSZip.loadAsync(zipFile);
+    for (const [path, zipEntry] of Object.entries(zip.files)) {
+      if (zipEntry.dir) continue;
+      const name = path.split('/').pop().replace(/\.[^.]+$/, ''); // filename without ext
+      const arrayBuffer = await zipEntry.async('arraybuffer');
+      const ext = path.split('.').pop();
+      const mime = ext === 'ogg' ? 'audio/ogg' : ext === 'm4a' ? 'audio/mp4' : 'audio/webm';
+      const blob = new Blob([arrayBuffer], { type: mime });
+      // Match to item by French name
+      const item = findItemByFileName(name);
+      if (item) { await saveAudioToDB(item, blob); imported++; }
+    }
+  }
+
+  // Handle individual audio files
+  for (const f of files.filter(f => !f.name.endsWith('.zip'))) {
+    const name = f.name.replace(/\.[^.]+$/, '');
+    const item = findItemByFileName(name);
+    if (item) { await saveAudioToDB(item, f); imported++; }
+  }
+
+  renderGrid();
+  btn.textContent = `✅ ${imported} importés`;
+  setTimeout(() => { btn.textContent = '📂 Importer'; }, 3000);
+  event.target.value = '';
+}
+
+function findItemByFileName(name) {
+  const normalize = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  for (const theme of themes) {
+    for (const item of theme.items) {
+      if (normalize(item.fr) === normalize(name)) return item;
+    }
+  }
+  return null;
+}
 
 // --- Record Mode ---
 function toggleRecordMode() {
